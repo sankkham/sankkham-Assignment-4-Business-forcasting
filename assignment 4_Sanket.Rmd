@@ -1,0 +1,187 @@
+---
+title: "Time Modules"
+author: "Sanket"
+date: "2024-10-04"
+output: html_document
+---
+
+```{r}
+
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+
+#install.packages
+library(readxl)
+library(knitr)
+library(TTR)
+library(dplyr)
+library(ggplot2)
+library(forecast)
+
+# Load the Excel file
+file_path <- "C:/Users/Sanket Khamkar/Downloads/Data Dictionary_Sanket.xlsx"
+data <- read_excel(file_path)
+knitr::kable(data)
+head(data)
+
+# Function to convert 'Year_Quarter' to start date for each quarter
+convert_quarter_to_date <- function(quarter) {
+  if (is.na(quarter)) {
+    return(NA)  # Return NA if quarter is missing
+  }
+  year <- as.numeric(substr(quarter, 1, 4))
+  q <- substr(quarter, 6, 7)
+  
+  if (q == "Q1") {
+    return(as.Date(paste0(year, "-01-01")))
+  } else if (q == "Q2") {
+    return(as.Date(paste0(year, "-04-01")))
+  } else if (q == "Q3") {
+    return(as.Date(paste0(year, "-07-01")))
+  } else if (q == "Q4") {
+    return(as.Date(paste0(year, "-10-01")))
+  } else {
+    return(NA)  # Return NA if the quarter is not in a recognized format
+  }
+}
+
+# Apply the conversion to the 'Year Quarter' column
+data$Date <- sapply(data$`Year_Quarter`, convert_quarter_to_date)
+
+# Convert the 'Rate' column to numeric and clean up the data
+data$Rate <- as.numeric(data$Rate)
+data <- data[!is.na(data$Date) & !is.na(data$Rate), ]
+
+# Create a time series object with quarterly frequency (4 quarters per year)
+ts_data <- ts(data$Rate, start=c(2022, 1), frequency=4)
+plot(ts_data)
+acf(ts_data)
+str(data$Rate)
+
+#Mean forcast
+mean_forecast <- meanf(ts_data, 5)
+plot(mean_forecast)
+
+#Mean forcast
+naive_forecast <- naive(ts_data,5)
+plot(naive_forecast)
+
+#Random walk forcast
+rwf_forecast <- rwf(ts_data,5)
+rwf_forecast <- rwf(ts_data,5, drift=TRUE)
+plot(rwf_forecast)
+
+#Seasonal Naive forcast
+snaive_forecast <- snaive(ts_data,5)
+plot(snaive_forecast)
+
+#Moving Average forcast
+MA5_forecast <- ma(ts_data,order=5)
+plot(MA5_forecast)
+MA9_forecast <- ma(ts_data,order=9)
+#MA9_forecast <- ma(data$Rate,order=9)
+plot(MA9_forecast)
+
+# what other attributes are there?
+attributes(naive_forecast)
+
+# Stfl forcast
+stlf_forecast <- stlf(ts_data, method="ets")
+plot(stlf_forecast)
+
+ets_forecast <- ets(ts_data)
+plot(ets_forecast)
+attributes(ets_forecast)
+ets_forecast$mse
+
+# Holt's linear method
+
+holt_forecast <- holt(ts_data)
+plot(holt_forecast)
+
+# Holt-Winters seasonal method
+HW_forecast <- HoltWinters(ts_data)
+plot(HW_forecast)
+
+#SUm of squared errors method
+SSE_Simple <- HoltWinters(ts_data,beta=FALSE,gamma=FALSE)
+attributes(SSE_Simple)
+plot(SSE_Simple)
+SSE_Simple$SSE
+head(SSE_Simple$fitted)
+
+#Forecast
+forecast_ets_1 <- forecast.ets(ets_forecast, h=5)
+plot(forecast_ets_1)
+forecast_ets_2 <- forecast(ets_forecast, h=5)
+plot(forecast_ets_2)
+
+#Winter forcaste
+winters_forecast <- hw(ts_data, seasonal="additive")
+plot(winters_forecast)
+
+
+# Question 2: Understand and Explain your model output??
+#I observed the models' behavior on the graph to see which ones follow the trend and seasonality of the data closely. To understand and explain the output of my forecasting models I compared their accuracy.
+
+# 1.	Mean Forecast (meanf): This method forecasts future values using the average (mean) of all previous observation hence there is no further adjustments are made for trends or seasonality.
+
+# 2.	Naive Forecast (naive): Here the future values will be the same as the last observed value.
+
+# 3.	Random Walk Forecast (rwf): The plot shows forecasts that drift upwards or downwards based on the trend in the past data.
+
+# 4.	Seasonal Naive Forecast (snaive): The plot repeats the values from the previous year, making it ideal for time series with repeating seasonal patterns. (for example, predicting January's value based on the previous January).
+
+# 5.	Moving Average (MA) Forecast (ma): In the plot, the moving average forecast will appear smoother than the original data, especially for higher order values (e.g., order=9).
+
+# 6.	Exponential Smoothing (ETS) (ets): The plot shows how the model adjusts for both the trend and the seasonality, providing more dynamic forecasts compared to simpler methods.
+
+# 7.	Holt's Linear Method (holt): The forecast shows a linear trend extending into the future, with the forecasted values rising or falling in a straight line depending on the direction of the trend.
+
+# 8.	Holt-Winters Seasonal Method (HoltWinters): The plot shows the seasonal pattern repeating into the future, while the trend component may cause the forecast to rise or fall over time.
+
+#9. STLF (Seasonal and Trend Decomposition using Loess): The plot shows smooth forecasts capturing both the seasonality and trend of the time series, with adjustments for any irregular patterns in the remainder component.
+
+#10.Simple Exponential Smoothing (SES): The plot shows a smooth forecast based on the simple level of the time series without considering trends or seasonal patterns.
+
+
+# Question3: Plot the time series and different model forecasts in one chart
+# Here I combined multiple forecasts on one chart allows a visual comparison of each model's predictions. This provides insight into how each model handles the data's characteristics (trend, seasonality, etc.).
+
+plot(mean_forecast)
+lines(naive_forecast$mean,col="green")
+lines(rwf_forecast$mean,col="black")
+lines(snaive_forecast$mean,col="blue")
+lines(MA5_forecast,col="red")
+lines(MA9_forecast,col="pink")
+lines(ets_forecast$mean,col="orange")
+lines(holt_forecast$mean,col="yellow")
+lines(winters_forecast$mean,col="brown")
+
+
+# Accuracy checked
+# Pick an accuracy measure, compare your models, and state the best model based on the accuracy comparison
+accuracy(naive_forecast)
+accuracy(mean_forecast)
+accuracy(snaive_forecast)
+accuracy(ets_forecast)
+accuracy(forecast_ets_2)
+accuracy(holt_forecast)
+accuracy(winters_forecast)
+accuracy(stlf_forecast)
+
+# Question4: Pick an accuracy measure, compare your models, and state the best model based on the accuracy comparison??
+
+#Accuracy Comparison: The model with the lowest RMSE (or MSE) is generally the best model to use for forecasting because it minimizes prediction errors. Hence, the best model will be the one with the lowest RMSE or MSE based on your comparison of the different models. 
+#Lower MSE or RMSE means a model has smaller prediction errors.
+
+#In this case, STLF performs the best with the lowest RMSE and MAPE values, followed by Holt-Winters and ETS.
+#STLF might perform better than ETS, SES, and Holt-Winters if your data contains complex seasonal patterns or local trend variations that the other models cannot handle well.
+#ETS and Holt-Winters are strong contenders when dealing with data that has clear trend and seasonality.
+#SES is generally not recommended for data with trend or seasonality, as it only handles level smoothing.
+
+#In this case, based on RMSE, the STLF model would be selected as the best one since it has a lower RMSE compared to Holt-Winters.
+
+
+
+
+```
